@@ -162,7 +162,7 @@ fun BrowserScreen(
         )
     }
     LaunchedEffect(settings.browserEngine) {
-        state.setEngine(if (settings.browserEngine == 1) BrowserEngineType.SERVO else BrowserEngineType.WEBVIEW)
+        state.switchEngine(if (settings.browserEngine == 1) BrowserEngineType.SERVO else BrowserEngineType.WEBVIEW)
     }
     val favorites = remember { FavoritesStore(context) }
     remember { Diag.log("BrowserScreen composed, favorites=" + favorites.items.size) }

@@ -706,7 +706,7 @@ class BrowserState(
         if (target.isNotEmpty()) tab.load(target)
     }
 
-    fun setEngine(value: BrowserEngineType) {
+    fun switchEngine(value: BrowserEngineType) {
         if (engine == value) return
         engine = value
         tabs.forEach { it.switchEngine(value) }
