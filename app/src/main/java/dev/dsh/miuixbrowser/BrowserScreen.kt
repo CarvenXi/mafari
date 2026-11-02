@@ -163,6 +163,13 @@ fun BrowserScreen(
     }
     LaunchedEffect(settings.browserEngine) {
         state.switchEngine(if (settings.browserEngine == 1) BrowserEngineType.SERVO else BrowserEngineType.WEBVIEW)
+        if (settings.browserEngine == 1 && settings.pageEnhancements) {
+            settings.updatePageEnhancements(false)
+        }
+    }
+    LaunchedEffect(settings.pageEnhancements, settings.browserEngine, state.tabs.size) {
+        val enabled = settings.browserEngine == 0 && settings.pageEnhancements
+        state.tabs.forEach { it.pageEnhancements = enabled }
     }
     val favorites = remember { FavoritesStore(context) }
     remember { Diag.log("BrowserScreen composed, favorites=" + favorites.items.size) }

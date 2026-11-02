@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -86,6 +87,12 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
 ) {
     val context = LocalContext.current
+    // Servo 暂不支持 Mafari 的页面增强能力，切换到 Servo 后持久化关闭。
+    LaunchedEffect(settings.browserEngine) {
+        if (settings.browserEngine == 1 && settings.pageEnhancements) {
+            settings.updatePageEnhancements(false)
+        }
+    }
     var showSearch by remember { mutableStateOf(false) }
     var showWallpaper by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -175,7 +182,10 @@ fun SettingsScreen(
                         title = "浏览器内核",
                         items = listOf("Android WebView", "Servo（实验性）"),
                         selectedIndex = settings.browserEngine,
-                        onSelectedIndexChange = { settings.updateBrowserEngine(it) },
+                        onSelectedIndexChange = {
+                            settings.updateBrowserEngine(it)
+                            if (it == 1) settings.updatePageEnhancements(false)
+                        },
                     )
                     OverlayDropdownPreference(
                         title = "外部链接打开方式",
@@ -212,12 +222,33 @@ fun SettingsScreen(
                         summary = "用户脚本 / 油猴脚本",
                         onClick = onOpenScripts,
                     )
-                    SwitchPreference(
-                        title = "页面增强",
-                        summary = "关闭后不注入油猴脚本、去广告规则和长按标记",
-                        checked = settings.pageEnhancements,
-                        onCheckedChange = { settings.updatePageEnhancements(it) },
-                    )
+                    if (settings.browserEngine == 1) {
+                        // 用纯展示行替代开关，避免 Servo 模式下用户误以为可以开启。
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                        ) {
+                            Text(
+                                text = "页面增强",
+                                fontSize = 14.sp,
+                                color = MiuixTheme.colorScheme.onSurface,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "Servo 内核暂不支持，已自动关闭",
+                                fontSize = 12.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                        }
+                    } else {
+                        SwitchPreference(
+                            title = "页面增强",
+                            summary = "关闭后不注入油猴脚本、去广告规则和长按标记",
+                            checked = settings.pageEnhancements,
+                            onCheckedChange = { settings.updatePageEnhancements(it) },
+                        )
+                    }
                 }
 
                 SmallTitle(text = "关于")

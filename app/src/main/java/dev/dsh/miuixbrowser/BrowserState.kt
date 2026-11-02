@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.view.ViewGroup
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -477,8 +478,24 @@ class BrowserTab(private val appContext: Context, initialEngine: BrowserEngineTy
                     url = pageUrl
                     syncNav()
                 }
-                override fun onImeShow() {}
-                override fun onImeHide() {}
+                // Servo 通过这两个回调通知宿主显示/隐藏 Android 输入法。
+                // 不处理这两个回调时，网页 input/textarea 获得焦点也不会弹出系统键盘。
+                override fun onImeShow() {
+                    servoView?.post {
+                        val view = servoView ?: return@post
+                        view.isFocusableInTouchMode = true
+                        view.requestFocus()
+                        val imm = appContext.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                        imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+                    }
+                }
+                override fun onImeHide() {
+                    servoView?.post {
+                        val view = servoView ?: return@post
+                        val imm = appContext.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                        imm?.hideSoftInputFromWindow(view.windowToken, 0)
+                    }
+                }
                 override fun onMediaSessionMetadata(title: String, artist: String, album: String) {}
                 override fun onMediaSessionPlaybackStateChange(state: Int) {}
                 override fun onMediaSessionSetPositionState(duration: Float, position: Float, playbackRate: Float) {}
@@ -698,6 +715,12 @@ class BrowserState(
     }
 
     fun newTab(target: String = "") {
+        // 当前 Servo AAR 的多实例/多标签切换尚未验证稳定性，Servo 模式暂用单标签回退：
+        // 点击“新建标签页”回到当前标签主页；带目标地址的新标签请求则在当前标签加载。
+        if (engine == BrowserEngineType.SERVO && tabs.isNotEmpty()) {
+            if (target.isBlank()) activeTab.goHome() else activeTab.load(target)
+            return
+        }
         val tab = BrowserTab(context, engine)
         tab.customUserAgent = userAgent
         tab.applyUserAgent()
@@ -736,6 +759,11 @@ class BrowserState(
     }
 
     fun newTabInBackground(target: String) {
+        // Servo 暂不创建后台 ServoView，退化为在当前标签打开目标地址。
+        if (engine == BrowserEngineType.SERVO && tabs.isNotEmpty()) {
+            activeTab.load(target)
+            return
+        }
         val tab = BrowserTab(context, engine)
         tabs.add(tab)
         tab.load(target)

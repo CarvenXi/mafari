@@ -1,6 +1,6 @@
 # Servo 双内核集成说明
 
-本次修改以 `mafari-main.zip` 为基线，并将用户提供的 `servo-aarch64-android.aar` 放入 `app/libs/`。
+本项目不再要求把 Servo AAR 提交到 Git。Gradle 会在编译前自动从 Servo 官方 GitHub Release 下载 `servo-aarch64-android.aar`，并下载同名 `.sha256` 文件进行完整性校验。
 
 ## 使用方式
 1. 打开设置 -> 浏览 -> 浏览器内核。
@@ -22,3 +22,17 @@ Servo 当前只包含 `arm64-v8a` 原生库，因此目标设备必须支持 arm
 
 ## 构建
 项目仍使用原有 Gradle Wrapper、AGP、Kotlin 和 Android SDK 配置。需要安装项目要求的 Android SDK 37 / Build Tools 36.0.0，并使用 JDK 17 或兼容版本。
+
+首次执行 `./gradlew :app:assembleDebug` 时，Gradle 会自动下载 Servo AAR 到 `app/build/generated/servo/`，校验成功后再进入编译流程。该文件位于 `build/` 目录，不需要也不应该提交到 Git。
+
+默认下载地址：
+`https://github.com/servo/servo/releases/latest/download/servo-aarch64-android.aar`
+
+默认校验地址为 AAR 下载地址追加 `.sha256`。如需使用镜像或固定版本，可通过 Gradle 属性或环境变量覆盖：
+
+- `-PservoAarUrl=https://example.com/servo-aarch64-android.aar`
+- `-PservoAarSha256Url=https://example.com/servo-aarch64-android.aar.sha256`
+- 或设置环境变量 `SERVO_AAR_URL`、`SERVO_AAR_SHA256_URL`
+
+清理构建目录后会重新下载。若希望不清理目录、强制检查并重新下载最新 AAR，可执行：
+`./gradlew :app:assembleDebug -PrefreshServoAar=true`
