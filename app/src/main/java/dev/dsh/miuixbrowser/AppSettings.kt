@@ -12,13 +12,13 @@ class AppSettings(context: Context) {
     var blurEnabled by mutableStateOf(prefs.getBoolean(KEY_BLUR, true))
         private set
 
-    /** 浏览器内核：0=Android WebView，1=Servo（实验性） */
-    var browserEngine by mutableStateOf(prefs.getInt(KEY_BROWSER_ENGINE, 0).coerceIn(0, 1))
+    /** Selected browser engine: 0=WebView, 1=Servo plugin. */
+    var browserEngine by mutableStateOf(prefs.getInt(KEY_ENGINE, 0))
         private set
 
-    fun updateBrowserEngine(engine: Int) {
-        browserEngine = engine.coerceIn(0, 1)
-        prefs.edit().putInt(KEY_BROWSER_ENGINE, browserEngine).apply()
+    fun updateBrowserEngine(value: Int) {
+        browserEngine = value.coerceIn(0, 1)
+        prefs.edit().putInt(KEY_ENGINE, browserEngine).apply()
     }
 
     /** 外部链接打开方式：0=应用内打开 1=交给其他浏览器（询问） */
@@ -116,7 +116,7 @@ class AppSettings(context: Context) {
 
     private companion object {
         const val KEY_BLUR = "blur"
-        const val KEY_BROWSER_ENGINE = "browser_engine"
+        const val KEY_ENGINE = "browser_engine"
         const val KEY_UA = "ua"
         const val KEY_THEME = "theme_mode"
         const val KEY_SEARCH = "search_index"

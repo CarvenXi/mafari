@@ -140,6 +140,7 @@ fun AboutScreen(onBack: () -> Unit, blurEnabled: Boolean = true) {
                 AboutRow("MIUIX", "0.9.4")
                 AboutRow("内核版本", kernel)
             }
+            CheckUpdateButton()
 
             SmallTitle(text = "本机 UA")
             Card(
@@ -209,9 +210,7 @@ fun AboutScreen(onBack: () -> Unit, blurEnabled: Boolean = true) {
                 title = "关于",
                 color = Color.Transparent,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
-                    }
+                    GlassBackButton(backdrop = pageBackdrop, onClick = onBack)
                 },
                 defaultWindowInsetsPadding = false,
                 modifier = Modifier.statusBarsPadding(),

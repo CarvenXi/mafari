@@ -102,11 +102,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import org.servo.servoview.Servo as ServoSurface
+import dev.dsh.miuixbrowser.engine.BrowserEngineHost
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -162,10 +160,13 @@ fun BrowserScreen(
         )
     }
     LaunchedEffect(settings.browserEngine) {
-        state.switchEngine(if (settings.browserEngine == 1) BrowserEngineType.SERVO else BrowserEngineType.WEBVIEW)
-        if (settings.browserEngine == 1 && settings.pageEnhancements) {
-            settings.updatePageEnhancements(false)
+        val target = if (settings.browserEngine == 1) BrowserEngineType.SERVO else BrowserEngineType.WEBVIEW
+        val switched = runCatching { state.switchEngine(target) }.isSuccess
+        if (!switched && settings.browserEngine == 1) {
+            settings.updateBrowserEngine(0)
+            android.widget.Toast.makeText(context, "Servo 内核加载失败，已回退到 WebView", android.widget.Toast.LENGTH_LONG).show()
         }
+        if (settings.browserEngine == 1 && settings.pageEnhancements) settings.updatePageEnhancements(false)
     }
     LaunchedEffect(settings.pageEnhancements, settings.browserEngine, state.tabs.size) {
         val enabled = settings.browserEngine == 0 && settings.pageEnhancements
@@ -215,6 +216,7 @@ fun BrowserScreen(
     var showDownloads by remember { mutableStateOf(false) }
     var showExtensions by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
+    var showBookmarksHistory by remember { mutableStateOf(false) }
     var pendingScript by remember { mutableStateOf<String?>(null) }
     var settingsReturn by remember { mutableStateOf(false) }
     var pendingDownload by remember { mutableStateOf<DownloadRequest?>(null) }
@@ -274,7 +276,7 @@ fun BrowserScreen(
         if (addressTitleUrl != tab.url) {
             addressTitleUrl = tab.url
             // 真正导航加载时旧标题会残留；同文档 history.pushState 则保留当前标题。
-            tab.title = if (tab.loading) "" else if (tab.engine == BrowserEngineType.WEBVIEW) tab.webView.title.orEmpty() else tab.title
+            tab.title = if (tab.loading) "" else tab.pageTitle.ifBlank { tab.title }
         }
     }
 
@@ -327,8 +329,7 @@ fun BrowserScreen(
                     tab.refreshNavigationState()
                     barHidden = false
                 } else {
-                    val webView = tab.webView
-                    val offset = webView.scrollY.coerceAtLeast(0)
+                    val offset = tab.scrollY.coerceAtLeast(0)
                     val dy = offset - last
                     when {
                         offset <= 12 -> {
@@ -386,6 +387,10 @@ fun BrowserScreen(
                 settingsReturn = false
             }
             showExtensions -> showExtensions = false
+            showBookmarksHistory -> {
+                showBookmarksHistory = false
+                if (settingsReturn) { showSettings = true; settingsReturn = false }
+            }
             showHistory -> showHistory = false
             showSettings -> showSettings = false
             showDownloads -> showDownloads = false
@@ -441,63 +446,10 @@ fun BrowserScreen(
                     .padding(top = contentTopPadding),
             ) {
                 key(tab.id, tab.engine) {
-                    if (tab.engine == BrowserEngineType.SERVO) {
-                        tab.servoView?.let { servoView ->
-                            ServoSurface(servoView, Modifier.fillMaxSize())
-                        }
-                    } else {
-                    AndroidView(
-                        factory = { _ ->
-                            // AndroidView.factory 接收的是 Context，而不是 View。
-                            // 这里返回已经由 BrowserTab 持有的 WebView 实例。
-                            tab.webView.apply {
-                                layoutParams = android.view.ViewGroup.LayoutParams(
-                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                )
-                                androidx.core.view.ViewCompat.requestApplyInsets(this)
-                                requestLayout()
-                            }
-                        },
-                        update = { view ->
-                            // update 在 View 已进入 AndroidView 容器后执行；此时重新请求 Insets
-                            // 才能确保 WebView 获得当前 Window 的真实可用区域。
-                            view.post {
-                                if (view.isAttachedToWindow) {
-                                    androidx.core.view.ViewCompat.requestApplyInsets(view)
-                                    view.requestLayout()
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .onSizeChanged { size ->
-                                // Compose 的尺寸才是当前沉浸式内容区域的真实可用尺寸。
-                                // 尺寸有效后让 WebView 重新布局，再通知页面重新计算响应式布局。
-                                if (size.width > 0 && size.height > 0) {
-                                    tab.webView.post {
-                                        if (tab.webView.isAttachedToWindow) {
-                                            tab.webView.requestLayout()
-                                            tab.webView.invalidate()
-                                            tab.webView.evaluateJavascript(
-                                                """
-                                                (function() {
-                                                    try {
-                                                        window.dispatchEvent(new Event('resize'));
-                                                        if (window.visualViewport) {
-                                                            window.visualViewport.dispatchEvent(new Event('resize'));
-                                                        }
-                                                    } catch (_) {}
-                                                })();
-                                                """.trimIndent(),
-                                                null
-                                            )
-                                        }
-                                    }
-                                }
-                            },
+                    BrowserEngineHost(
+                        adapter = tab.activeEngineAdapter,
+                        modifier = Modifier.fillMaxSize(),
                     )
-                    }
                 }
                 if (tab.url.isEmpty()) {
                     if (wallpaperBitmap == null) {
@@ -529,7 +481,7 @@ fun BrowserScreen(
             }
             if (tab.url.isNotEmpty()) {
                 PullRefreshArea(
-                    canPull = { tab.engine == BrowserEngineType.WEBVIEW && tab.webView.scrollY <= 0 },
+                    canPull = { tab.canPullToRefresh },
                     onRefresh = { tab.reload() },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
@@ -940,14 +892,14 @@ fun BrowserScreen(
                     ) {
                         sheet = Sheet.None
                         UserAdRules.add(context, hostOf(tab.url), hit.selector)
-                        if (tab.engine == BrowserEngineType.WEBVIEW) {
-                            tab.webView.evaluateJavascript(removeElementJs(hit.selector), null)
+                        if (tab.engineCapabilities.elementInspection) {
+                            tab.evaluateJavaScript(removeElementJs(hit.selector))
                         }
                     }
                     SheetRow(title = "仅移除该元素") {
                         sheet = Sheet.None
-                        if (tab.engine == BrowserEngineType.WEBVIEW) {
-                            tab.webView.evaluateJavascript(removeElementJs(hit.selector), null)
+                        if (tab.engineCapabilities.elementInspection) {
+                            tab.evaluateJavaScript(removeElementJs(hit.selector))
                         }
                     }
                 }
@@ -961,6 +913,11 @@ fun BrowserScreen(
                 settings = settings,
                 onBack = { showSettings = false },
                 onPickUa = { showUaPicker = true },
+                onOpenBookmarksHistory = {
+                    settingsReturn = true
+                    showSettings = false
+                    showBookmarksHistory = true
+                },
                 onOpenDownloads = {
                     settingsReturn = true
                     showSettings = false
@@ -1080,6 +1037,24 @@ fun BrowserScreen(
             ExtensionsScreen(
                 store = extensions,
                 onBack = { showExtensions = false },
+                blurEnabled = settings.blurEnabled,
+            )
+        }
+
+        if (showBookmarksHistory) {
+            BookmarksHistoryScreen(
+                favorites = favorites,
+                history = history,
+                onBack = {
+                    showBookmarksHistory = false
+                    if (settingsReturn) { showSettings = true; settingsReturn = false }
+                },
+                onOpen = { targetUrl ->
+                    showBookmarksHistory = false
+                    showSettings = false
+                    settingsReturn = false
+                    tab.loadUrl(targetUrl)
+                },
                 blurEnabled = settings.blurEnabled,
             )
         }

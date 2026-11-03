@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "MiuixBrowser"
-include(":app")
+include(":app", ":servo-engine-plugin")
