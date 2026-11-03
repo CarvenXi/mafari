@@ -97,7 +97,7 @@ fun BookmarksHistoryScreen(
                     LazyColumn(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(7.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp, bottom = 92.dp),
+                        contentPadding = PaddingValues(start = 12.dp, top = 4.dp, end = 12.dp, bottom = 92.dp),
                     ) {
                         items(favorites.items.toList()) { item ->
                             Column(
