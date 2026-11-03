@@ -30,8 +30,8 @@ android {
         applicationId = "dev.dsh.miuixbrowser"
         minSdk = 33
         targetSdk = 36
-        versionCode = 95
-        versionName = "v1.0.11-dev"
+        versionCode = 123
+        versionName = "v1.2.1-Multi_core"
         buildConfigField("String", "SERVO_PLUGIN_APK_URL", "\"${servoPluginUrl.get()}\"")
         buildConfigField("String", "SERVO_PLUGIN_SHA256", "\"${servoPluginSha256.get()}\"")
     }
