@@ -30,7 +30,8 @@ class ServoPluginManager(context: Context) {
         onProgress: (Long, Long) -> Unit = { _, _ -> },
     ) = withContext(Dispatchers.IO) {
         require(apkUrl.startsWith("https://")) { "引擎下载地址必须使用 HTTPS" }
-        require(expectedSha256.matches(Regex("(?i)[0-9a-f]{64}"))) { "缺少有效的 SHA-256" }
+        val checksum = expectedSha256.takeIf { it.matches(Regex("(?i)[0-9a-f]{64}")) }
+            ?: fetchChecksum(apkUrl)
         val part = File(root, "servo-engine.apk.part")
         try {
             val connection = URL(apkUrl).openConnection().apply {
@@ -57,7 +58,7 @@ class ServoPluginManager(context: Context) {
             }
             val actual = MessageDigest.getInstance("SHA-256").digest(part.readBytes())
                 .joinToString("") { "%02x".format(it) }
-            require(actual.equals(expectedSha256, true)) { "SHA-256 校验失败" }
+            require(actual.equals(checksum, true)) { "SHA-256 校验失败：下载文件与发布校验值不一致" }
             val backup = File(root, "servo-engine.apk.bak")
             if (backup.exists()) backup.delete()
             if (apk.exists()) check(apk.renameTo(backup)) { "无法备份当前内核" }
@@ -74,6 +75,20 @@ class ServoPluginManager(context: Context) {
                 throw installError
             }
         } finally { part.delete() }
+    }
+
+
+    /** SHA file is published beside the APK as servo-engine.apk.sha256. */
+    private fun fetchChecksum(apkUrl: String): String {
+        val checksumUrl = "$apkUrl.sha256"
+        val connection = URL(checksumUrl).openConnection().apply {
+            connectTimeout = 15_000
+            readTimeout = 20_000
+            setRequestProperty("User-Agent", "Mafari-EngineManager")
+        }
+        val body = connection.getInputStream().bufferedReader().use { it.readText() }
+        return Regex("(?i)\\b[0-9a-f]{64}\\b").find(body)?.value
+            ?: error("无法读取 Servo 插件 SHA-256：$checksumUrl")
     }
 
     fun createClassLoader(): ClassLoader {

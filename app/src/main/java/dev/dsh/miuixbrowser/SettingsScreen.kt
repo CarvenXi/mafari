@@ -183,62 +183,6 @@ fun SettingsScreen(
                     insideMargin = PaddingValues(0.dp),
                 ) {
                     OverlayDropdownPreference(
-                        title = "浏览器内核",
-                        items = listOf("Android WebView", "Servo（实验性）"),
-                        selectedIndex = settings.browserEngine,
-                        onSelectedIndexChange = { selected ->
-                            if (selected == 0) {
-                                settings.updateBrowserEngine(0)
-                                engineDownloadState = ""
-                            } else if (servoManager.isInstalled()) {
-                                settings.updateBrowserEngine(1)
-                                settings.updatePageEnhancements(false)
-                            } else {
-                                engineScope.launch {
-                                    val url = BuildConfig.SERVO_PLUGIN_APK_URL
-                                    val sha = BuildConfig.SERVO_PLUGIN_SHA256
-                                    if (url.isBlank() || sha.isBlank()) {
-                                        engineDownloadState = "尚未配置 Servo 插件发布地址与 SHA-256"
-                                    } else {
-                                        engineDownloadState = "正在下载 Servo 内核…"
-                                        runCatching { servoManager.install(url, sha) }
-                                            .onSuccess {
-                                                settings.updateBrowserEngine(1)
-                                                settings.updatePageEnhancements(false)
-                                                engineDownloadState = "Servo 内核已安装"
-                                            }
-                                            .onFailure { engineDownloadState = "下载失败：${it.message ?: "未知错误"}" }
-                                    }
-                                }
-                            }
-                        },
-                    )
-                    if (engineDownloadState.isNotBlank()) {
-                        Text(
-                            text = engineDownloadState,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                            fontSize = 12.sp,
-                        )
-                    }
-                    SettingsRow(
-                        title = "Servo 内核管理",
-                        summary = if (servoManager.isInstalled()) "已安装 · ${(servoManager.installedSize() / (1024 * 1024))} MB · 点击检查更新/重新下载" else "尚未安装",
-                        onClick = {
-                            engineScope.launch {
-                                val url = BuildConfig.SERVO_PLUGIN_APK_URL
-                                val sha = BuildConfig.SERVO_PLUGIN_SHA256
-                                if (url.isBlank() || sha.isBlank()) {
-                                    engineDownloadState = "尚未配置 Servo 插件发布地址与 SHA-256"
-                                } else {
-                                    engineDownloadState = "正在下载/更新 Servo 内核…"
-                                    runCatching { servoManager.install(url, sha) }
-                                        .onSuccess { engineDownloadState = "Servo 内核已安装/更新" }
-                                        .onFailure { engineDownloadState = "更新失败：${it.message ?: "未知错误"}" }
-                                }
-                            }
-                        },
-                    )
-                    OverlayDropdownPreference(
                         title = "外部链接打开方式",
                         items = listOf("应用内打开", "自定义标签页", "其他浏览器"),
                         selectedIndex = settings.linkOpenMode.coerceIn(0, 2),
@@ -277,6 +221,62 @@ fun SettingsScreen(
                         title = "脚本管理",
                         summary = "用户脚本 / 油猴脚本",
                         onClick = onOpenScripts,
+                    )
+                    OverlayDropdownPreference(
+                        title = "浏览器内核",
+                        items = listOf("Android WebView", "Servo（实验性）"),
+                        selectedIndex = settings.browserEngine,
+                        onSelectedIndexChange = { selected ->
+                            if (selected == 0) {
+                                settings.updateBrowserEngine(0)
+                                engineDownloadState = ""
+                            } else if (servoManager.isInstalled()) {
+                                settings.updateBrowserEngine(1)
+                                settings.updatePageEnhancements(false)
+                            } else {
+                                engineScope.launch {
+                                    val url = BuildConfig.SERVO_PLUGIN_APK_URL
+                                    val sha = BuildConfig.SERVO_PLUGIN_SHA256
+                                    if (url.isBlank()) {
+                                        engineDownloadState = "Servo 插件发布地址未配置"
+                                    } else {
+                                        engineDownloadState = "正在下载 Servo 内核…"
+                                        runCatching { servoManager.install(url, sha) }
+                                            .onSuccess {
+                                                settings.updateBrowserEngine(1)
+                                                settings.updatePageEnhancements(false)
+                                                engineDownloadState = "Servo 内核已安装"
+                                            }
+                                            .onFailure { engineDownloadState = "下载失败：${it.message ?: "未知错误"}" }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                    if (engineDownloadState.isNotBlank()) {
+                        Text(
+                            text = engineDownloadState,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            fontSize = 12.sp,
+                        )
+                    }
+                    SettingsRow(
+                        title = "Servo 内核管理",
+                        summary = if (servoManager.isInstalled()) "已安装 · ${(servoManager.installedSize() / (1024 * 1024))} MB · 点击检查更新/重新下载" else "未安装 · 从 Mafari 发布页下载",
+                        onClick = {
+                            engineScope.launch {
+                                val url = BuildConfig.SERVO_PLUGIN_APK_URL
+                                val sha = BuildConfig.SERVO_PLUGIN_SHA256
+                                if (url.isBlank()) {
+                                    engineDownloadState = "Servo 插件发布地址未配置"
+                                } else {
+                                    engineDownloadState = "正在下载/更新 Servo 内核…"
+                                    runCatching { servoManager.install(url, sha) }
+                                        .onSuccess { engineDownloadState = "Servo 内核已安装/更新" }
+                                        .onFailure { engineDownloadState = "更新失败：${it.message ?: "未知错误"}" }
+                                }
+                            }
+                        },
                     )
                     if (settings.browserEngine == 1) {
                         // 用纯展示行替代开关，避免 Servo 模式下用户误以为可以开启。

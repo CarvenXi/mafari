@@ -6,25 +6,23 @@
 
 ## 构建与发布
 
-1. 构建 Servo 插件 APK：
+GitHub Actions 会自动构建并发布 Servo 插件：
 
-   ```bash
-   ./scripts/package-servo-plugin.sh
-   ```
+- `:servo-engine-plugin:assembleRelease` 生成独立插件 APK。
+- 工作流复制为 `servo-engine.apk`，并生成 `servo-engine.apk.sha256`。
+- 推送 `v*` 标签时，两个文件会与 Mafari APK 一起上传到 GitHub Release。
+- 主应用默认使用 `https://github.com/CarvenXi/mafari/releases/latest/download/servo-engine.apk`。
+- 安装时优先使用构建时注入的 `servoPluginSha256`；未注入时，自动读取同地址追加 `.sha256` 的校验文件。
 
-   插件模块 `:servo-engine-plugin` 在构建时下载 Servo AAR，并将其代码及 JNI 库封装进独立 APK。主模块 `:app` 不再引用 Servo AAR。
+本地构建时仍可覆盖发布地址和固定校验值：
 
-2. 将 `dist/servo-engine/servo-engine.apk` 上传到 HTTPS 发布地址。
-3. 记录 `servo-engine.apk.sha256` 中的 SHA-256。
-4. 构建主应用时注入固定的下载地址和校验值：
+```bash
+./gradlew :app:assembleRelease \
+  -PservoPluginUrl=https://your-host.example/releases/servo-engine.apk \
+  -PservoPluginSha256=<64位SHA256>
+```
 
-   ```bash
-   ./gradlew :app:assembleRelease \
-     -PservoPluginUrl=https://your-host.example/releases/servo-engine.apk \
-     -PservoPluginSha256=<64位SHA256>
-   ```
-
-   生产版本应将 URL 与 SHA-256 固定在受信任的构建产物中，不要从不可信的远端清单无校验地更新它们。
+如果使用默认发布地址，首次需要推送一个 `v*` 标签触发 Release 工作流，确保 Release 中包含插件 APK 和 SHA-256 文件。`main` 分支构建会将插件作为 Actions artifact 输出，但不会自动创建 GitHub Release。
 
 ## 运行流程
 
@@ -35,7 +33,7 @@
 
 ## 安全与兼容性
 
-- 仅允许 HTTPS 下载，并要求构建时固定 SHA-256。
+- 仅允许 HTTPS 下载；优先使用构建时固定的 SHA-256，未固定时从同一可信 GitHub Release 下载 `.sha256` 文件并校验。生产环境建议固定 SHA-256。
 - 插件 APK 不作为 Android 应用安装；它只作为代码容器由 Mafari 私有 ClassLoader 加载。
 - 当前插件构建面向 `arm64-v8a` / `armeabi-v7a`，最终可用 ABI 取决于 Servo AAR 实际包含的 JNI 库。
 - Android 动态代码加载受平台安全策略约束。插件只能来自可信发布源；不要允许用户任意导入 APK/JAR。

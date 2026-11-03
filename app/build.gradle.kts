@@ -11,7 +11,10 @@ plugins {
 }
 
 // Servo engine is delivered as a separately built APK plugin. The main app has no Servo classes.
-val servoPluginUrl = providers.gradleProperty("servoPluginUrl").orElse("")
+// Default to the latest Servo plugin asset published with Mafari GitHub Releases.
+// A SHA-256 may be supplied at build time; otherwise the app fetches the adjacent .sha256 file.
+val servoPluginUrl = providers.gradleProperty("servoPluginUrl")
+    .orElse("https://github.com/CarvenXi/mafari/releases/latest/download/servo-engine.apk")
 val servoPluginSha256 = providers.gradleProperty("servoPluginSha256").orElse("")
 
 android {

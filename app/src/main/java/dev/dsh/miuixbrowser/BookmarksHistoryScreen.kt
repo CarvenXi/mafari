@@ -28,9 +28,6 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun BookmarksHistoryScreen(
@@ -41,6 +38,7 @@ fun BookmarksHistoryScreen(
     blurEnabled: Boolean = true,
 ) {
     val context = LocalContext.current
+    var selectedTab by remember { mutableIntStateOf(0) } // 0=书签，1=历史
     var showActions by remember { mutableStateOf(false) }
     var showEditor by remember { mutableStateOf(false) }
     var editIndex by remember { mutableIntStateOf(-1) }
@@ -69,24 +67,47 @@ fun BookmarksHistoryScreen(
             Modifier.fillMaxSize().layerBackdrop(backdrop).navigationBarsPadding()
                 .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp)
         ) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("书签", modifier = Modifier.weight(1f), fontSize = 17.sp, color = MiuixTheme.colorScheme.onSurface)
-                Text("历史", modifier = Modifier.weight(1f), fontSize = 17.sp, color = MiuixTheme.colorScheme.onSurface)
+            // 顶部双栏切换：任意时刻只显示一个页面，不再并排挤压内容。
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MiuixTheme.colorScheme.surfaceContainer),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                listOf("书签", "历史").forEachIndexed { index, label ->
+                    Box(
+                        Modifier.weight(1f).clip(RoundedCornerShape(11.dp))
+                            .background(if (selectedTab == index) MiuixTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
+                            .clickable { selectedTab = index }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            label,
+                            fontSize = 14.sp,
+                            color = if (selectedTab == index) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f).fillMaxHeight()) {
-                    if (favorites.items.isEmpty()) EmptyPane("暂无书签")
-                    else LazyColumn(verticalArrangement = Arrangement.spacedBy(7.dp), contentPadding = PaddingValues(bottom = 92.dp)) {
+            if (selectedTab == 0) {
+                if (favorites.items.isEmpty()) {
+                    EmptyPane("暂无书签")
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp, bottom = 92.dp),
+                    ) {
                         items(favorites.items.toList()) { item ->
                             Column(
                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
                                     .background(MiuixTheme.colorScheme.surfaceContainerHigh)
-                                    .clickable { onOpen(item.url) }.padding(11.dp)
+                                    .clickable { onOpen(item.url) }.padding(12.dp)
                             ) {
                                 Text(item.name, fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(4.dp))
-                                Text(item.url, fontSize = 10.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(item.url, fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                     Text("编辑", fontSize = 11.sp, color = MiuixTheme.colorScheme.primary,
                                         modifier = Modifier.clickable {
@@ -99,23 +120,12 @@ fun BookmarksHistoryScreen(
                         }
                     }
                 }
-                Column(Modifier.weight(1f).fillMaxHeight()) {
-                    if (history.items.isEmpty()) EmptyPane("暂无记录")
-                    else LazyColumn(verticalArrangement = Arrangement.spacedBy(7.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                        items(history.items.toList()) { entry ->
-                            Column(
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-                                    .background(MiuixTheme.colorScheme.surfaceContainerHigh)
-                                    .clickable { onOpen(entry.url) }.padding(11.dp)
-                            ) {
-                                Text(entry.title, fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Spacer(Modifier.height(4.dp))
-                                Text(SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(entry.time)), fontSize = 10.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                                Text(entry.url, fontSize = 10.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
-                }
+            } else {
+                HistoryListContent(
+                    store = history,
+                    onOpen = onOpen,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
             }
         }
         Box(
@@ -127,16 +137,19 @@ fun BookmarksHistoryScreen(
                 color = Color.Transparent,
                 navigationIcon = { GlassBackButton(backdrop = backdrop, onClick = onBack) },
                 actions = {
-                    IconButton(onClick = { exportPicker.launch("mafari-bookmarks.html") }) {
-                        Text("导出", fontSize = 13.sp, color = MiuixTheme.colorScheme.primary)
+                    if (selectedTab == 0) {
+                        IconButton(onClick = { exportPicker.launch("mafari-bookmarks.html") }) {
+                            Text("导出", fontSize = 13.sp, color = MiuixTheme.colorScheme.primary)
+                        }
+                    } else if (history.items.isNotEmpty()) {
+                        IconButton(onClick = { history.clear() }) { Icon(MiuixIcons.Delete, contentDescription = "清空历史") }
                     }
-                    IconButton(onClick = { history.clear() }) { Icon(MiuixIcons.Delete, contentDescription = "清空历史") }
                 },
                 defaultWindowInsetsPadding = false,
                 modifier = Modifier.statusBarsPadding(),
             )
         }
-        Box(
+        if (selectedTab == 0) Box(
             Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 22.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
                 .size(54.dp).clip(CircleShape)
                 .textureBlurBar(
