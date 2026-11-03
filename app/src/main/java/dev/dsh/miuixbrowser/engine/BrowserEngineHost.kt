@@ -4,7 +4,7 @@ import android.view.ViewGroup
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.onSizeChanged
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.viewinterop.AndroidView
 
 /** All downloadable engines expose an Android View; engine-specific classes stay in their plugin APK. */
@@ -33,8 +33,8 @@ fun BrowserEngineHost(adapter: BrowserEngineAdapter, modifier: Modifier = Modifi
                 engineView.post {
                     if (engineView.isAttachedToWindow) {
                         engineView.requestLayout(); engineView.invalidate()
-                        if (adapter is WebViewEngineAdapter) engineView.evaluateJavascript(
-                            "window.dispatchEvent(new Event('resize')); if(window.visualViewport)window.visualViewport.dispatchEvent(new Event('resize'));", null
+                        adapter.evaluateJavaScript(
+                            "window.dispatchEvent(new Event('resize')); if(window.visualViewport)window.visualViewport.dispatchEvent(new Event('resize'));"
                         )
                     }
                 }

@@ -419,7 +419,7 @@ private const val PROJECT_URL = "https://github.com/rosenii/mafari"
 private const val RELEASE_API = "https://api.github.com/repos/rosenii/mafari/releases/latest"
 
 @Composable
-private fun CheckUpdateButton() {
+internal fun CheckUpdateButton() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var checking by remember { mutableStateOf(false) }
